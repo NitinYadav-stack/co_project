@@ -42,9 +42,8 @@ def getting_register(name):
     if name not in REGISTER:
         raise ValueError(f"Invalid register:{name}")
     return REGISTER[name]
-# ---------------- INSTRUCTION ENCODERS ---------------- #
 
-def encode_r(f7, rs2, rs1, f3, rd, op):
+def encode_R(f7, rs2, rs1, f3, rd, op):
     return (
         decimal_to_binary(f7,7) +
         rs2 +
@@ -55,7 +54,7 @@ def encode_r(f7, rs2, rs1, f3, rd, op):
     )
 
 
-def encode_i(imm, rs1, f3, rd, op):
+def encode_I(imm, rs1, f3, rd, op):
     if imm < -2048 or imm > 2047:
         raise ValueError("immediate outside 12-bit range")
     return (
@@ -67,7 +66,7 @@ def encode_i(imm, rs1, f3, rd, op):
     )
 
 
-def encode_s(imm, rs2, rs1, f3, op):
+def encode_S(imm, rs2, rs1, f3, op):
     imm_bin = decimal_to_binary(imm,12)
 
     return (
@@ -79,7 +78,7 @@ def encode_s(imm, rs2, rs1, f3, op):
         decimal_to_binary(op,7)
     )
 
-def encode_b(offset, rs2, rs1, f3, op):
+def encode_B(offset, rs2, rs1, f3, op):
     imm = decimal_to_binary(offset,13)
     bit12 = imm[0]
     bit11 = imm[1]
@@ -97,11 +96,11 @@ def encode_b(offset, rs2, rs1, f3, op):
     )
 
 
-def encode_u(imm, rd, op):
+def encode_U(imm, rd, op):
     return decimal_to_binary(imm,20) + rd + decimal_to_binary(op,7)
 
 
-def encode_j(offset, rd, op):
+def encode_J(offset, rd, op):
     imm = decimal_to_binary(offset,21)
     bit20 = imm[0]
     bit10_1 = imm[10:20]
@@ -168,18 +167,6 @@ def assembly(input_file, output_file,readable_file):
         mnemonic= parts[0].upper()
         instructions.append((pc, mnemonic, parts[1:],line))
         pc +=4
-    if not instructions:
-        errors.append("missing halt instruction")
-    else:
-        last_pc,last_m, last_ops,last_raw =instructions[-1]
-        is_halt =(
-            last_m =='BEQ'and
-            len(last_ops)>= 3 and
-            last_ops[0].strip() in ('zero','x0') and
-            last_ops[1].strip() in ('zero', 'x0')
-        )
-        if not is_halt:
-            errors.append("missing halt or not in last")
     if errors:
         for e in errors:
             print(f"Error: {e}", file=sys.stderr)
@@ -208,7 +195,7 @@ def instruction_encoding(mnemonic,operands,labels, pc):
         if len(operands)!= n:
             raise ValueError(f"{m} req {n} operands and got {len(operands)}")
     def reg(i):
-        return get_register(operands[i])
+        return getting_register(operands[i])
     def label_offset(i):
         s = operands[i].strip()
         if s in labels:
@@ -223,110 +210,110 @@ def instruction_encoding(mnemonic,operands,labels, pc):
     if m =='add':
         check_ops(3)
         rd, rs1, rs2 = reg(0),reg(1),reg(2)
-        return encode_r(0b0000000,rs2,rs1,0b000, rd,0b0110011)
+        return encode_R(0b0000000,rs2,rs1,0b000, rd,0b0110011)
     elif m =='sub':
         check_ops(3)
         rd,rs1,rs2 =reg(0),reg(1),reg(2)
-        return encode_r(0b0100000,rs2, rs1,0b000, rd,0b0110011)
+        return encode_R(0b0100000,rs2, rs1,0b000, rd,0b0110011)
     elif m =='slt':
         check_ops(3)
         rd,rs1,rs2 = reg(0),reg(1),reg(2)
-        return encode_r(0b0000000, rs2, rs1, 0b010, rd, 0b0110011)
+        return encode_R(0b0000000, rs2, rs1, 0b010, rd, 0b0110011)
     elif m =='sltu':
         check_ops(3)
         rd, rs1,rs2 = reg(0),reg(1),reg(2)
-        return encode_r(0b0000000,rs2,rs1,0b011,rd, 0b0110011)
+        return encode_R(0b0000000,rs2,rs1,0b011,rd, 0b0110011)
     elif m =='and':
         check_ops(3)
         rd,rs1,rs2 =reg(0), reg(1),reg(2)
-        return encode_r(0b0000000, rs2, rs1, 0b111, rd, 0b0110011)
+        return encode_R(0b0000000, rs2, rs1, 0b111, rd, 0b0110011)
     elif m =='or':
         check_ops(3)
         rd, rs1,rs2 = reg(0),reg(1),reg(2)
-        return encode_r(0b0000000,rs2, rs1,0b110, rd,0b0110011)
+        return encode_R(0b0000000,rs2, rs1,0b110, rd,0b0110011)
     elif m =='xor':
         check_ops(3)
         rd,rs1,rs2 = reg(0),reg(1),reg(2)
-        return encode_r(0b0000000, rs2,rs1, 0b100,rd,0b0110011)
+        return encode_R(0b0000000, rs2,rs1, 0b100,rd,0b0110011)
     elif m =='sll':
         check_ops(3)
         rd,rs1,rs2 = reg(0),reg(1),reg(2)
-        return encode_r(0b0000000, rs2,rs1, 0b001,rd,0b0110011)
+        return encode_R(0b0000000, rs2,rs1, 0b001,rd,0b0110011)
     elif m =='srl':
         check_ops(3)
         rd,rs1, rs2 = reg(0), reg(1), reg(2)
-        return encode_r(0b0000000,rs2,rs1, 0b101,rd,0b0110011)
+        return encode_R(0b0000000,rs2,rs1, 0b101,rd,0b0110011)
     
     elif m=='addi':
         check_ops(3)
         rd,rs1 =reg(0), reg(1)
         imm= label_offset(2)
-        return encode_i(imm,rs1, 0b000,rd, 0b0010011)
+        return encode_I(imm,rs1, 0b000,rd, 0b0010011)
     elif m =='sltiu':
         check_ops(3)
         rd,rs1= reg(0),reg(1)
         imm =label_offset(2)
-        return encode_i(imm ,rs1, 0b011,rd, 0b0010011)
+        return encode_I(imm ,rs1, 0b011,rd, 0b0010011)
     elif m =='lw':
         check_ops(2)
         rd =reg(0)
         imm,rs1= read_imm_register(operands[1])
-        return encode_i(imm,rs1,0b010, rd,0b0000011)
+        return encode_I(imm,rs1,0b010, rd,0b0000011)
     elif m == 'jalr':
         check_ops(3)
         rd, rs1 = reg(0),reg(1)
         imm =int(operands[2].strip(),0)
-        return encode_i(imm, rs1,0b000, rd,0b1100111)
+        return encode_I(imm, rs1,0b000, rd,0b1100111)
     elif m =='sw':
         check_ops(2)
         rs2 =reg(0)
         imm,rs1 =read_imm_register(operands[1])
-        return encode_i(imm,rs2, rs1,0b010,0b0100011)
+        return encode_S(imm,rs2, rs1,0b010,0b0100011)
     elif m =='beq':
         check_ops(3)
         rs1,rs2 =reg(0),reg(1)
         offset =label_offset(2)
-        return encode_b(offset,rs2,rs1,0b000,0b1100011)
+        return encode_B(offset,rs2,rs1,0b000,0b1100011)
     elif m =='bne':
         check_ops(3)
         rs1,rs2 =reg(0),reg(1)
         offset= label_offset(2)
-        return encode_b(offset, rs2,rs1,0b001, 0b1100011)
+        return encode_B(offset, rs2,rs1,0b001, 0b1100011)
     elif m =='blt':
         check_ops(3)
         rs1, rs2 =reg(0), reg(1)
         offset= label_offset(2)
-        return encode_b(offset,rs2, rs1,0b100, 0b1100011)
+        return encode_B(offset,rs2, rs1,0b100, 0b1100011)
     elif m =='bge':
         check_ops(3)
         rs1, rs2= reg(0), reg(1)
         offset =label_offset(2)
-        return encode_b(offset,rs2, rs1,0b101, 0b1100011)
+        return encode_B(offset,rs2, rs1,0b101, 0b1100011)
     elif m =='bltu':
         check_ops(3)
         rs1,rs2= reg(0),reg(1)
         offset =label_offset(2)
-        return encode_b(offset, rs2,rs1,0b110,0b1100011)
+        return encode_B(offset, rs2,rs1,0b110,0b1100011)
     elif m =='bgeu':
         check_ops(3)
         rs1, rs2 = reg(0),reg(1)
         offset =label_offset(2)
-        return encode_b(offset,rs2, rs1,0b111,0b1100011)
+        return encode_B(offset,rs2, rs1,0b111,0b1100011)
     elif m == 'jal':
         check_ops(2)
         rd =reg(0)
         offset= label_offset(1)
-        return encode_j(offset, rd,0b1101111)
+        return encode_J(offset, rd,0b1101111)
     elif m =="lui":
         check_ops(2)
         rd =reg(0)
         imm =int(operands[1].strip(),0)
-        return encode_u(imm,rd,0b0110111)
+        return encode_U(imm,rd,0b0110111)
     elif m =='auipc':
         check_ops(2)
         rd= reg(0)
         imm =int(operands[1].strip(), 0)
-        return encode_u(imm,rd,0b0010111)
+        return encode_U(imm,rd,0b0010111)
     else:
         raise ValueError(f"Unknown instruction: {m}")
 
